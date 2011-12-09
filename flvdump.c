@@ -91,7 +91,7 @@ int main(int argc, char **argv)
     struct stat info;
     int         source;
     u_int32_t   last = 0, time, size, dsize;
-    u_char      *data, *current, type, bsize = 0, bdump = 0, blazy = 0;
+    u_char      *data, *current, type, encrypted, bsize = 0, bdump = 0, blazy = 0;
 
     TRAP(argc < 2, 1, "Usage: fldump [-s] [-d] [-l] <file>");
     argv ++;
@@ -134,10 +134,11 @@ int main(int argc, char **argv)
         {
             break;
         }
-        type     = *current;
-        size     = TAGSIZE(current + 1);
-        time     = TAGTIME(current + 4);
-        current += 11;
+        type      = *current & 0x1f;
+        encrypted = *current & 0xe0;
+        size      = TAGSIZE(current + 1);
+        time      = TAGTIME(current + 4);
+        current  += 11;
         printf("%s ", ms2tc(time, 0));
         if (bsize)
         {
@@ -166,7 +167,7 @@ int main(int argc, char **argv)
             dsize = size - ((*current >> 4) == 10 ? 2 : 1);
             if ((*current >> 4) == 10 && *(current + 1) == 0)
             {
-                printf("sh\n");
+                printf("sh");
             }
             else
             {
@@ -177,9 +178,7 @@ int main(int argc, char **argv)
                     case  2:  printf("22kHz "); break;
                     case  3:  printf("44kHz "); break;
                 }
-                printf("%s ", (*current & 0x02) ? "16bit" : "8bit");
-                printf("%s ", (*current & 0x01) ? "stereo" : "mono");
-                printf("\n");
+                printf("%s %s", (*current & 0x02) ? "16bit" : "8bit", (*current & 0x01) ? "stereo" : "mono");
             }
         }
         else if (type == 9)
@@ -197,12 +196,12 @@ int main(int argc, char **argv)
             }
             if ((*current & 0x0f) == 7 && *(current + 1) == 0)
             {
-                printf("sh\n");
+                printf("sh");
                 dsize = size - 5;
             }
             else if ((*current & 0x0f) == 7 && *(current + 1) == 2)
             {
-                printf("eos\n");
+                printf("eos");
                 dsize = 0;
             }
             else
@@ -221,31 +220,31 @@ int main(int argc, char **argv)
                     case 2:
                          switch (((*(current + 4) & 0x03) << 1) + (*(current + 5) >> 7))
                          {
-                             case 0: printf("%dx%d ",
+                             case 0: printf("%dx%d",
                                             ((*(current + 5) << 1) & 0xfe) + ((*(current + 6) >> 7) & 0x01),
                                             ((*(current + 6) << 1) & 0xfe) + ((*(current + 7) >> 7) & 0x01)
                                            );
                                      break;
-                             case 1: printf("%dx%d ",
+                             case 1: printf("%dx%d",
                                             ((((*(current + 5) << 1) & 0xfe) + ((*(current + 6) >> 7) & 0x01)) << 8) + ((*(current + 6) << 1) & 0xfe) + ((*(current + 7) >> 7) & 0x01),
                                             ((((*(current + 7) << 1) & 0xfe) + ((*(current + 8) >> 7) & 0x01)) << 8) + ((*(current + 8) << 1) & 0xfe) + ((*(current + 9) >> 7) & 0x01)
                                            );
                                      break;
-                             case 2: printf("352x288 "); break;
-                             case 3: printf("176x144 "); break;
-                             case 4: printf("128x96 ");  break;
-                             case 5: printf("320x240 "); break;
-                             case 6: printf("160x120 "); break;
+                             case 2: printf("352x288"); break;
+                             case 3: printf("176x144"); break;
+                             case 4: printf("128x96");  break;
+                             case 5: printf("320x240"); break;
+                             case 6: printf("160x120"); break;
                          }
                          break;
 
                     case 3:
                     case 6:
-                         printf("%dx%d ", ((*(current + 1) & 0x0f) << 8) + *(current + 2), ((*(current + 3) & 0x0f) << 8) + *(current + 4));
+                         printf("%dx%d", ((*(current + 1) & 0x0f) << 8) + *(current + 2), ((*(current + 3) & 0x0f) << 8) + *(current + 4));
                          break;
 
                     case 4:
-                         printf("%dx%d ", (*(current + 8) * 16) - (*(current + 1) >> 4), (*(current + 7) * 16) - (*(current + 1) & 0x0f));
+                         printf("%dx%d", (*(current + 8) * 16) - (*(current + 1) >> 4), (*(current + 7) * 16) - (*(current + 1) & 0x0f));
                          break;
 
                     case 5:
@@ -255,15 +254,15 @@ int main(int argc, char **argv)
                         printf("+%dms", (*(current + 2) << 24) + (*(current + 3) << 8) + *(current + 4));
                         break;
                 }
-                printf("\n");
                 dsize = size - ((*current & 0x0f) == 7 ? 5 : 1);
             }
         }
         else
         {
-            printf("\n");
             dsize = size;
         }
+        printf("%s\n", encrypted ? " (encrypted)" : "");
+
         if (bdump && dsize)
         {
             hexdump(current + size - dsize, dsize, 12 + (bsize * 7));
