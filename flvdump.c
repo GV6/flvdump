@@ -91,23 +91,27 @@ int main(int argc, char **argv)
     struct stat info;
     int         source;
     u_int32_t   last = 0, time, size, dsize;
-    u_char      *data, *current, type, encrypted, bsize = 0, bdump = 0, blazy = 0;
+    u_char      *data, *current, type, filtered, bsize = 0, bdump = 0, bheader = 0, blazy = 0;
 
-    TRAP(argc < 2, 1, "Usage: fldump [-s] [-d] [-l] <file>");
+    TRAP(argc < 2, 1, "Usage: fldump [-s] [-d] [-l] [-h] <file>");
     argv ++;
     while (*argv)
     {
-        if (! strcmp(*argv, "-s"))
+        if (!strcasecmp(*argv, "-s"))
         {
             bsize = 1;
         }
-        else if (! strcmp(*argv, "-d"))
+        else if (!strcasecmp(*argv, "-d"))
         {
             bdump = 1;
         }
-        else if (! strcmp(*argv, "-l"))
+        else if (!strcasecmp(*argv, "-l"))
         {
             blazy = 1;
+        }
+        else if (!strcasecmp(*argv, "-h"))
+        {
+            bheader = 1;
         }
         else
         {
@@ -116,7 +120,7 @@ int main(int argc, char **argv)
         argv ++;
     }
     TRAP(!*argv || stat(*argv, &info) < 0 || !S_ISREG(info.st_mode) || (source = open(*argv, O_RDONLY)) < 0 || !(data = mmap(NULL, info.st_size, PROT_READ, MAP_PRIVATE, source, 0)), 2, "Cannot open FLV file - aborting");
-    TRAP(info.st_size < 9 + 4 || memcmp(data, "FLV", 3) || FLVSIZE(data + 5) != 9 || FLVSIZE(data + 9) != 0, 3, "Invalid FLV file - aborting");
+    TRAP(!bheader && (info.st_size < 9 + 4 || memcmp(data, "FLV", 3) || FLVSIZE(data + 5) != 9 || FLVSIZE(data + 9) != 0), 3, "Invalid FLV file - aborting");
     TRAP(!blazy && info.st_size - (last = FLVSIZE(data + info.st_size - 4)) < 0, 4, "Malformed FLV file - aborting");
     if (!blazy && info.st_size > 9 + 4)
     {
@@ -124,21 +128,25 @@ int main(int argc, char **argv)
     }
     printf("Filename: %s\n", *argv);
     printf("Filesize: %lu bytes\n", info.st_size);
-    printf("Version:  %d\n", data[3]);
-    printf("Duration: %s\n", ms2tc(last, 1));
-    printf("Tracks:   %s%s\n\n", (data[4] & 0x04) ? "audio " : "", (data[4] & 0x01) ? "video" : "");
-    current = data + 9 + 4;
+    if (!bheader)
+    {
+        printf("Version:  %d\n", data[3]);
+        printf("Duration: %s\n", ms2tc(last, 1));
+        printf("Tracks:   %s%s\n", (data[4] & 0x04) ? "audio " : "", (data[4] & 0x01) ? "video" : "");
+    }
+    printf("\n");
+    current = data + (bheader ? 0 : 9) + 4;
     while (1)
     {
         if (current + 4 >= data + info.st_size)
         {
             break;
         }
-        type      = *current & 0x1f;
-        encrypted = *current & 0xe0;
-        size      = TAGSIZE(current + 1);
-        time      = TAGTIME(current + 4);
-        current  += 11;
+        type     = *current & 0x1f;
+        filtered = *current & 0xe0;
+        size     = TAGSIZE(current + 1);
+        time     = TAGTIME(current + 4);
+        current += 11;
         printf("%s ", ms2tc(time, 0));
         if (bsize)
         {
@@ -261,7 +269,7 @@ int main(int argc, char **argv)
         {
             dsize = size;
         }
-        printf("%s\n", encrypted ? " (encrypted)" : "");
+        printf("%s\n", filtered ? " (filtered)" : "");
 
         if (bdump && dsize)
         {
