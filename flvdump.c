@@ -89,34 +89,20 @@ void hexdump(u_char *input, u_int32_t size, u_int32_t indent)
 int main(int argc, char **argv)
 {
     struct stat info;
-    int         source;
-    u_int32_t   last = 0, time, size, dsize;
-    u_char      *data, *current, type, filtered, bsize = 0, bdump = 0, bheader = 0, blazy = 0;
+    int         source, index;
+    u_int32_t   last = 0, time, size, dsize, msize;
+    u_char      *data, *current, type, filtered, bsize = 0, bdata = 0, ball = 0, bheader = 0, blazy = 0;
+    char        iv[50];
 
-    TRAP(argc < 2, 1, "Usage: fldump [-s] [-d] [-l] [-h] <file>");
+    TRAP(argc < 2, 1, "Usage: fldump [-s(ize)] [-d(ata)] [-a(ll)] [-l(azy)] [-h(eader)] <file>");
     argv ++;
-    while (*argv)
+    while (*argv && **argv == '-')
     {
-        if (!strcasecmp(*argv, "-s"))
-        {
-            bsize = 1;
-        }
-        else if (!strcasecmp(*argv, "-d"))
-        {
-            bdump = 1;
-        }
-        else if (!strcasecmp(*argv, "-l"))
-        {
-            blazy = 1;
-        }
-        else if (!strcasecmp(*argv, "-h"))
-        {
-            bheader = 1;
-        }
-        else
-        {
-            break;
-        }
+        if      (!strncasecmp(*argv, "-size",   strlen(*argv))) bsize   = 1;
+        else if (!strncasecmp(*argv, "-data",   strlen(*argv))) bdata   = 1;
+        else if (!strncasecmp(*argv, "-all",    strlen(*argv))) ball    = 1;
+        else if (!strncasecmp(*argv, "-lazy",   strlen(*argv))) blazy   = 1;
+        else if (!strncasecmp(*argv, "-header", strlen(*argv))) bheader = 1;
         argv ++;
     }
     TRAP(!*argv || stat(*argv, &info) < 0 || !S_ISREG(info.st_mode) || (source = open(*argv, O_RDONLY)) < 0 || !(data = mmap(NULL, info.st_size, PROT_READ, MAP_PRIVATE, source, 0)), 2, "Cannot open FLV file - aborting");
@@ -131,7 +117,10 @@ int main(int argc, char **argv)
     if (!bheader)
     {
         printf("Version:  %d\n", data[3]);
-        printf("Duration: %s\n", ms2tc(last, 1));
+        if (!blazy)
+        {
+            printf("Duration: %s\n", ms2tc(last, 1));
+        }
         printf("Tracks:   %s%s\n", (data[4] & 0x04) ? "audio " : "", (data[4] & 0x01) ? "video" : "");
     }
     printf("\n");
@@ -143,16 +132,17 @@ int main(int argc, char **argv)
             break;
         }
         type     = *current & 0x1f;
-        filtered = *current & 0xe0;
+        filtered = *current & 0x20;
         size     = TAGSIZE(current + 1);
         time     = TAGTIME(current + 4);
-        current += 11;
         printf("%s ", ms2tc(time, 0));
         if (bsize)
         {
-            printf("%6d ", size);
+            printf(" @%-9ld %6d ", current - data, size);
         }
         printf("%s ", TAGTYPE(type));
+        current += 11;
+        *iv      = 0;
         if (type == 8)
         {
             switch (*current >> 4)
@@ -172,7 +162,6 @@ int main(int argc, char **argv)
                 case 15:  printf("device "); break;
                 default: printf("??? "); break;
             }
-            dsize = size - ((*current >> 4) == 10 ? 2 : 1);
             if ((*current >> 4) == 10 && *(current + 1) == 0)
             {
                 printf("sh");
@@ -187,6 +176,24 @@ int main(int argc, char **argv)
                     case  3:  printf("44kHz "); break;
                 }
                 printf("%s %s", (*current & 0x02) ? "16bit" : "8bit", (*current & 0x01) ? "stereo" : "mono");
+            }
+            dsize = size - ((*current >> 4) == 10 ? 2 : 1);
+            if (filtered)
+            {
+                msize  = dsize;
+                dsize -= 8;
+                if (*(current + size - dsize - 1))
+                {
+                    for (index = 0; index < 16; index ++)
+                    {
+                        sprintf(iv + strlen(iv), "%02x%s", *(current + size - dsize + index), index < 15 ? " " : "");
+                    }
+                    dsize -= 16;
+                }
+                if (ball)
+                {
+                    dsize = msize;
+                }
             }
         }
         else if (type == 9)
@@ -263,17 +270,37 @@ int main(int argc, char **argv)
                         break;
                 }
                 dsize = size - ((*current & 0x0f) == 7 ? 5 : 1);
+                if (filtered)
+                {
+                    msize  = dsize;
+                    dsize -= 8;
+                    if (*(current + size - dsize - 1))
+                    {
+                        for (index = 0; index < 16; index ++)
+                        {
+                            sprintf(iv + strlen(iv), "%02x%s", *(current + size - dsize + index), index < 15 ? " " : "");
+                        }
+                        dsize -= 16;
+                    }
+                    if (ball)
+                    {
+                        dsize = msize;
+                    }
+                }
             }
         }
         else
         {
             dsize = size;
         }
-        printf("%s\n", filtered ? " (filtered)" : "");
-
-        if (bdump && dsize)
+        if (filtered && *iv)
         {
-            hexdump(current + size - dsize, dsize, 12 + (bsize * 7));
+            printf(" encrypted iv=[%s]", iv);
+        }
+        printf("\n");
+        if (bdata && dsize)
+        {
+            hexdump(current + size - dsize, dsize, 12 + (bsize * 19));
         }
         current += size + 4;
     }
