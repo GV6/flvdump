@@ -94,7 +94,7 @@ int main(int argc, char **argv)
     u_char      *data, *current, type, filtered, bsize = 0, bdata = 0, ball = 0, bheader = 0, blazy = 0;
     char        iv[50];
 
-    TRAP(argc < 2, 1, "Usage: fldump [-s(ize)] [-d(ata)] [-a(ll)] [-l(azy)] [-h(eader)] <file>");
+    TRAP(argc < 2, 1, "Usage: flvdump [-s(ize)] [-d(ata)] [-a(ll)] [-l(azy)] [-h(eader)] <file>");
     argv ++;
     while (*argv && **argv == '-')
     {
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
         printf("Tracks:   %s%s\n", (data[4] & 0x04) ? "audio " : "", (data[4] & 0x01) ? "video" : "");
     }
     printf("\n");
-    current = data + (bheader ? 0 : 9) + 4;
+    current = data + (bheader ? 0 : 9 + 4);
     while (1)
     {
         if (current + 4 >= data + info.st_size)
