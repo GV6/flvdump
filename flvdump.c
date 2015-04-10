@@ -313,7 +313,12 @@ int main(int argc, char **argv)
 			//hexdump(current + size - dsize, dsize, 12 + (bsize * 19));
 			if(type == 8)
 			{
-				aac_decoder(current + size - dsize, dsize);
+				ret = aac_decoder(current + size - dsize, dsize);
+				if(ret < 0)
+				{
+					printf("Decoder Fialed\n");
+					//return 0;
+				}
 			}
 		}
 		current += size + 4;
