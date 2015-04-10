@@ -90,7 +90,14 @@ void hexdump(u_char *input, u_int32_t size, u_int32_t indent)
 // Main program entry
 int main(int argc, char **argv)
 {
-	aac_decoder_init();
+	int ret;
+	ret = aac_decoder_init();
+	if(ret < 0)
+	{
+		printf("Aac decoder failed!\n");
+		return 0;
+	}
+
 	struct stat info;
 	int         source, index;
 	u_int32_t   last = 0, time, size, dsize, msize;
