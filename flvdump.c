@@ -188,6 +188,7 @@ int main(int argc, char **argv)
 				printf("%s %s", (*current & 0x02) ? "16bit" : "8bit", (*current & 0x01) ? "stereo" : "mono");
 			}
 			dsize = size - ((*current >> 4) == 10 ? 2 : 1);
+			ret = aac_decoder(current + size - dsize, dsize);
 			if (filtered)
 			{
 				msize  = dsize;
@@ -311,15 +312,16 @@ int main(int argc, char **argv)
 		if (bdata && dsize)
 		{
 			//hexdump(current + size - dsize, dsize, 12 + (bsize * 19));
-			if(type == 8)
-			{
-				ret = aac_decoder(current + size - dsize, dsize);
-				if(ret < 0)
-				{
-					printf("Decoder Fialed\n");
-					//return 0;
-				}
+			/*			if(type == 8)
+						{
+						ret = aac_decoder(current + size - dsize, dsize);
+						if(ret < 0)
+						{
+						printf("Decoder Fialed\n");
+			//return 0;
 			}
+			}
+			 */
 		}
 		current += size + 4;
 	}
