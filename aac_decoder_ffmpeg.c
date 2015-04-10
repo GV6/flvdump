@@ -1,4 +1,5 @@
-
+#include <fcntl.h>
+#include <unistd.h>
 #include "aac_decoder_ffmpeg.h"
 
 #include <libswscale/swscale.h>
@@ -7,6 +8,7 @@
 #include <libswresample/swresample.h>
 
 #define ADTS_HEADER_SIZE 7
+#define AAC_DATA_SIZE 1024
 
 typedef struct PutBitContext {
 	uint32_t bit_buf;
@@ -15,10 +17,14 @@ typedef struct PutBitContext {
 	int size_in_bits;
 } PutBitContext;
 
+AVFrame *m_AvFrame_audio;
+AVCodec *m_AvCodec_audio = NULL;
+AVCodecContext *m_AvCodecContext_audio = NULL;
+
+int aac_file;
+
 int aac_decoder_init()
 {
-	AVCodec *m_AvCodec_audio = NULL;
-	AVCodecContext *m_AvCodecContext_audio = NULL;
 	avcodec_register_all();
 
 	m_AvCodec_audio = avcodec_find_decoder(CODEC_ID_AAC);
@@ -37,6 +43,14 @@ int aac_decoder_init()
 	if (avcodec_open2(m_AvCodecContext_audio, m_AvCodec_audio, NULL) < 0) {
 		return -1;
 	}
+
+	if (!(m_AvFrame_audio = av_frame_alloc())) {
+		return -1;
+	} 
+
+	aac_file = open("test.aac", O_CREAT | O_TRUNC | O_RDWR);
+	if(aac_file < 0)
+		return -1;
 
 	return 0;
 }
@@ -143,8 +157,36 @@ int ff_adts_write_frame_header(int objecttype, int sample_rate_index,
 int aac_decoder(unsigned char *buf, int size)
 {
 	printf("hello aac decoder\n");
+	unsigned char buffer[AAC_DATA_SIZE] = {0};
+	int len;
+	int got_frame;
 
+	ff_adts_write_frame_header(1, 4, 2, (u_int8_t*)buffer, size+ADTS_HEADER_SIZE);	
 
+	AVPacket av_packet;
+	av_init_packet(&av_packet);
+
+	memcpy(buffer+ADTS_HEADER_SIZE, buf, size);	
+	
+	//write aac file
+	write(aac_file, buffer, size+ADTS_HEADER_SIZE);
+
+	av_packet.data = buffer;
+	av_packet.size = size+ADTS_HEADER_SIZE;
+
+	len = avcodec_decode_audio4(m_AvCodecContext_audio, m_AvFrame_audio,
+			&got_frame, &av_packet);	
+
+	if(len < 0)
+	{
+		printf("Len < 0\n");
+		return -1;
+	}
+
+	if(got_frame)
+	{
+		printf("Succeed\n");
+	}
 
 	return 0;
 }
