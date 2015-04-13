@@ -7,8 +7,11 @@
 #include <libavutil/frame.h>
 #include <libswresample/swresample.h>
 
+#include <libavutil/intreadwrite.h>
+#include <libavutil/avassert.h>
+
 #define ADTS_HEADER_SIZE 7
-#define AAC_DATA_SIZE 1024
+#define AAC_DATA_SIZE 2048
 
 typedef struct PutBitContext {
 	uint32_t bit_buf;
@@ -22,6 +25,7 @@ AVCodec *m_AvCodec_audio = NULL;
 AVCodecContext *m_AvCodecContext_audio = NULL;
 
 int aac_file;
+int aac_raw_file;
 
 int aac_decoder_init()
 {
@@ -52,10 +56,14 @@ int aac_decoder_init()
 	if(aac_file < 0)
 		return -1;
 
+	aac_raw_file = open("test_raw.aac", O_CREAT | O_TRUNC | O_RDWR);
+	if(aac_file < 0)
+		return -1;
+
 	return 0;
 }
 
-static void init_put_bits(PutBitContext *s, uint8_t *buffer,
+static inline void init_put_bits(PutBitContext *s, uint8_t *buffer,
 		int buffer_size) {
 	if (buffer_size < 0) {
 		buffer_size = 0;
@@ -70,9 +78,11 @@ static void init_put_bits(PutBitContext *s, uint8_t *buffer,
 	s->bit_buf = 0;
 }
 
-static void put_bits(PutBitContext *s, int n, unsigned int value) {
+static inline void put_bits(PutBitContext *s, int n, unsigned int value) {
 	unsigned int bit_buf;
 	int bit_left;
+
+	av_assert2(n <= 31 && value < (1U << n));
 
 	bit_buf = s->bit_buf;
 	bit_left = s->bit_left;
@@ -81,6 +91,8 @@ static void put_bits(PutBitContext *s, int n, unsigned int value) {
 #ifdef BITSTREAM_WRITER_LE
 	bit_buf |= value << (32 - bit_left);
 	if (n >= bit_left) {
+		av_assert2(s->buf_ptr+3<s->buf_end);
+		AV_WL32(s->buf_ptr, bit_buf);
 		s->buf_ptr += 4;
 		bit_buf = (bit_left == 32) ? 0 : value >> bit_left;
 		bit_left += 32;
@@ -93,6 +105,8 @@ static void put_bits(PutBitContext *s, int n, unsigned int value) {
 	} else {
 		bit_buf <<= bit_left;
 		bit_buf |= value >> (n - bit_left);
+		av_assert2(s->buf_ptr+3<s->buf_end);
+		AV_WB32(s->buf_ptr, bit_buf);
 		s->buf_ptr += 4;
 		bit_left += 32 - n;
 
@@ -104,7 +118,7 @@ static void put_bits(PutBitContext *s, int n, unsigned int value) {
 	s->bit_left = bit_left;
 }
 
-static void flush_put_bits(PutBitContext *s) {
+static inline void flush_put_bits(PutBitContext *s) {
 #ifndef BITSTREAM_WRITER_LE
 	if (s->bit_left < 32)
 		s->bit_buf <<= s->bit_left;
@@ -161,8 +175,10 @@ int aac_decoder(unsigned char *buf, int size)
 	int len;
 	int got_frame;
 
-	ff_adts_write_frame_header(1, 4, 2, (u_int8_t*)buffer, size+ADTS_HEADER_SIZE);	
+	write(aac_raw_file, buf, size);
 
+	ff_adts_write_frame_header(1, 7, 2, buffer, size+ADTS_HEADER_SIZE);	
+	printf("OOOO %d %d %d %d\n", buffer[0], buffer[1], buffer[2], buffer[3]);
 	AVPacket av_packet;
 	av_init_packet(&av_packet);
 

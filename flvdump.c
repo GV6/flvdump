@@ -91,6 +91,9 @@ void hexdump(u_char *input, u_int32_t size, u_int32_t indent)
 int main(int argc, char **argv)
 {
 	int ret;
+	int acount = 0;
+	int vcount = 0;
+	int count = 0;
 	ret = aac_decoder_init();
 	if(ret < 0)
 	{
@@ -174,7 +177,7 @@ int main(int argc, char **argv)
 			}
 			if ((*current >> 4) == 10 && *(current + 1) == 0)
 			{
-				printf("sh");
+				printf("shi$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
 			}
 			else
 			{
@@ -188,6 +191,8 @@ int main(int argc, char **argv)
 				printf("%s %s", (*current & 0x02) ? "16bit" : "8bit", (*current & 0x01) ? "stereo" : "mono");
 			}
 			dsize = size - ((*current >> 4) == 10 ? 2 : 1);
+			count += dsize;
+			acount += dsize;
 			ret = aac_decoder(current + size - dsize, dsize);
 			if (filtered)
 			{
@@ -281,6 +286,8 @@ int main(int argc, char **argv)
 						break;
 				}
 				dsize = size - ((*current & 0x0f) == 7 ? 5 : 1);
+			count += dsize;
+			vcount += dsize;
 				if (filtered)
 				{
 					msize  = dsize;
@@ -302,6 +309,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
+			printf("KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK\n");
 			dsize = size;
 		}
 		if (filtered && *iv)
@@ -325,5 +333,6 @@ int main(int argc, char **argv)
 		}
 		current += size + 4;
 	}
+	printf("The total count is %d %d %d\n", acount, vcount, count);
 	return 0;
 }
