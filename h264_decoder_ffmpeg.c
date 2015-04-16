@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "ppm.h"
+#include "bmp.h"
 
 #include <libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
@@ -269,12 +271,13 @@ int h264_decoder(unsigned char *buf, int size)
 	}
 	printf("Decoder Succeed\n");
 
-	int ret = sws_scale(m_AvConvertContext, m_AvFrame_video->data,
+	int ret = sws_scale(m_AvConvertContext, (const uint8_t **const)m_AvFrame_video->data,
 			m_AvFrame_video->linesize, 0, 360, m_AvFrameRGB->data,
 			m_AvFrameRGB->linesize);
 
 	printf("%d\n", ret);
-
+	//SaveFrame(m_AvFrameRGB, 480, 360, count++);
+	SaveFrameToBMP(++count, 480, 360, 24, m_AvFrameRGB);
 	return 0;
 }
 
