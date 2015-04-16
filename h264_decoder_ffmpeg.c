@@ -92,7 +92,7 @@ int h264_decoder_init(int nImageWidth, int nImageHeight)
 	m_AvCodecContext_video->frame_number = 1;
 	m_AvCodecContext_video->codec_type = AVMEDIA_TYPE_VIDEO;
 	m_AvConvertContext = sws_getContext(nImageWidth, nImageHeight,
-			AV_PIX_FMT_YUV420P, nImageWidth, nImageHeight, AV_PIX_FMT_RGB24,
+			AV_PIX_FMT_YUV420P, nImageWidth, nImageHeight, AV_PIX_FMT_RGBA,
 			SWS_FAST_BILINEAR, NULL, NULL, NULL);
 
 	if (avcodec_open2(m_AvCodecContext_video, m_AvCodec_video, NULL) < 0) {
@@ -277,7 +277,7 @@ int h264_decoder(unsigned char *buf, int size)
 
 	printf("%d\n", ret);
 	//SaveFrame(m_AvFrameRGB, 480, 360, count++);
-	SaveFrameToBMP(++count, 480, 360, 24, m_AvFrameRGB);
+	SaveFrameToBMP(++count, 480, 360, 32, m_AvFrameRGB);
 	return 0;
 }
 

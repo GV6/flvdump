@@ -85,7 +85,7 @@ int SaveFrameToBMP(int count, int nWidth, int nHeight, int nBitCount, AVFrame *p
 	fwrite(&bmpinfo, sizeof(BITMAPINFOHEADER), 1, fp);  
 	for(y = 0; y < nHeight; y++)  
 	{  
-		fwrite(pFrame->data[0] + y * pFrame->linesize[0], 1, nWidth * 3, fp);  
+		fwrite(pFrame->data[0] + y * pFrame->linesize[0], 1, nWidth * nBitCount / 8, fp);  
 	} 	
 
 	//fwrite(pFrame->data[0], nWidth * nHeight * nBitCount / 8, 1, fp);  
